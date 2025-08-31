@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -18,33 +18,44 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install backend dependencies
-        run: cd backend && npm install
+      - name: Install Backend Dependencies
+        run: |
+          cd backend
+          npm install
 
-      - name: Install frontend dependencies
-        run: cd frontend && npm install
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm install
 
-      - name: Build frontend
-        run: cd frontend && npm run build
+      - name: Build Frontend
+        run: |
+          cd frontend
+          npm run build
 
-      - name: Copy files via SCP to VM
-        uses: appleboy/scp-action@v0.1.7
+      - name: Copy Files to Azure VM
+        uses: appleboy/scp-action@v0.7
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
-          source: "backend/*,frontend/dist/*"
-          target: "~/deployment"
+          source: |
+            backend/*
+            frontend/dist/*
+          target: ~/deployment
 
-      - name: Run deployment commands via SSH
-        uses: appleboy/ssh-action@v0.1.8
+      - name: Deploy on Azure VM and Capture Log
+        uses: appleboy/ssh-action@v0.8
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            cd ~/deployment/backend
-            npm install
-            pm2 restart app.js || pm2 start app.js
-            sudo cp -r ~/deployment/frontend/dist/* /var/www/html/
-            sudo systemctl reload nginx
+            {
+              cd ~/deployment/backend
+              npm install
+              pm2 restart app.js || pm2 start app.js
+              cp -r ~/deployment/frontend/dist/* /var/www/html/
+              sudo systemctl reload nginx
+              echo "Deployment finished on $(date)"
+            } &> ~/deployment/deploy.log
